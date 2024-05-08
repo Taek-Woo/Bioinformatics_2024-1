@@ -1,0 +1,19 @@
+import pandas as pd
+cnts = pd.read_csv('read-counts.txt', sep='\t', comment='#', index_col=0)
+cnts.head()
+
+cnts['clip_enrichment'] = cnts['CLIP-35L33G.bam'] / cnts['RNA-control.bam']
+cnts['rden_change'] = (cnts['RPF-siLin28a.bam'] / cnts['RNA-siLin28a.bam']) / (cnts['RPF-siLuc.bam'] / cnts['RNA-siLuc.bam'])
+cnts.head()
+
+from matplotlib import pyplot as plt
+import numpy as np
+
+fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+ax.scatter(np.log2(cnts['clip_enrichment']),
+           np.log2(cnts['rden_change']))
+
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+mouselocal = pd.read_csv('https://hyeshik.qbio.io/binfo/mouselocalization-20210507.txt', sep='\t')
+mouselocal.head()
