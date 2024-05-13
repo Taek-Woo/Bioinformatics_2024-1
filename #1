@@ -1,19 +1,35 @@
+[Log]
+
+[Set Up]
+wget -O - --no-check-certificate https://hyeshik.qbio.io/binfo/binfo1-datapack1.tar | tar -C . -xf -
+wget --no-check-certificate -O binfo1-datapack1/gencode.gtf.gz  http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M27/gencode.vM27.annotation.gtf.gz
+conda install -y subread
+
+[Transcript count table]
+mkdir binfo1-work
+rsync -Pav binfo1-datapack1/ binfo1-work/
+cd binfo1-work
+
+-- till
+
+featureCounts -a gencode.gtf -o read-counts.txt *.bam
+
 import pandas as pd
 cnts = pd.read_csv('read-counts.txt', sep='\t', comment='#', index_col=0)
 cnts.head()
-
 cnts['clip_enrichment'] = cnts['CLIP-35L33G.bam'] / cnts['RNA-control.bam']
 cnts['rden_change'] = (cnts['RPF-siLin28a.bam'] / cnts['RNA-siLin28a.bam']) / (cnts['RPF-siLuc.bam'] / cnts['RNA-siLuc.bam'])
 cnts.head()
-
 from matplotlib import pyplot as plt
 import numpy as np
-
 fig, ax = plt.subplots(1, 1, figsize=(5, 5))
 ax.scatter(np.log2(cnts['clip_enrichment']),
            np.log2(cnts['rden_change']))
 
+
+[protein localization]
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 mouselocal = pd.read_csv('https://hyeshik.qbio.io/binfo/mouselocalization-20210507.txt', sep='\t')
 mouselocal.head()
+
