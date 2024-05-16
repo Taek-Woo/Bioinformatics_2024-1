@@ -1,0 +1,14 @@
+!grep '	start_codon	.*	+	.*transcript_support_level "1"' ../binfo1-datapack1/gencode.gtf | \
+ sed -e 's/	[^	]*transcript_id "\([^"]*\)".*$/	\1/g' > gencode-start.gtf
+!head gencode-start.gtf
+!grep '	exon	.*	+	' ../binfo1-datapack1/gencode.gtf | \
+ sed -e 's/	[^	]*transcript_id "\([^"]*\)".*$/	\1/g' > gencode-plusexon.gtf
+!head gencode-plusexon.gtf
+!bedtools intersect -a gencode-start.gtf -b gencode-plusexon.gtf -wa -wb | \
+ awk -F'	' -v OFS='	' '$9 == $18 { print $10, $13-1, $14, $18, $4-1, $16; }' | \
+ sort -k1,1 -k2,3n -k4,4 > gencode-exons-containing-startcodon.bed
+!head gencode-exons-containing-startcodon.bed; tail gencode-exons-containing-startcodon.bed
+!(samtools view -H ../binfo1-datapack1/RPF-siLuc.bam; \
+  samtools view -F20 ../binfo1-datapack1/RPF-siLuc.bam | \
+  bioawk -c sam '{ if (length($seq) >= 25) print $0; }') | \
+ samtools view -b -o filtered-RPF-siLuc.bam
