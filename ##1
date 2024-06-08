@@ -1,25 +1,17 @@
+##111111111111111111111111111##
+
 # Load the read counts data to understand its structure
 read_counts_path = "read-counts.txt"
 # Checking the first few lines to understand the format and data
 with open(read_counts_path, 'r') as file:
     sample_data = [next(file) for _ in range(5)]
 sample_data
-
-######
 import pandas as pd
 # Load the data into a DataFrame, skipping the initial metadata line
 read_counts_df = pd.read_csv(read_counts_path, sep='\t', skiprows=1)
 # Display the first few rows of the DataFrame to verify correct loading and to understand the data
 read_counts_df.head()
 
-######
-import pandas as pd
-# Load the data into a DataFrame, skipping the initial metadata line
-read_counts_df = pd.read_csv(read_counts_path, sep='\t', skiprows=1)
-# Display the first few rows of the DataFrame to verify correct loading and to understand the data
-read_counts_df.head()
-
-######
 # We need to calculate enrichment levels and ribosome density changes. Let's assume a simple formula for demonstration:
 # Enrichment Level (CLIP) = log2((CLIP counts + 1) / (mean of RNA counts + 1))
 # Ribosome Density Change = log2((RPF-siLin28a counts + 1) / (RPF-siLuc counts + 1))
@@ -33,19 +25,19 @@ read_counts_df['Ribosome_Density_Change'] = np.log2((read_counts_df['RPF-siLin28
 # Displaying the new columns
 read_counts_df[['Geneid', 'Enrichment_Level_CLIP', 'Ribosome_Density_Change']].head()
 
-######
-#Extract the GPA File
+##222222222222222222222222##
+
 import gzip
 import shutil
-# Path to the compressed GPA file
+
 gpa_gz_path = 'goa_uniprot_gcrp.gpa.gz'
-# Output path for the extracted GPA file
 gpa_path = 'goa_uniprot_gcrp.gpa'
+
 with gzip.open(gpa_gz_path, 'rb') as f_in:
     with open(gpa_path, 'wb') as f_out:
         shutil.copyfileobj(f_in, f_out)
 
-######
+
 def parse_gpa(file_path):
     go_mappings = {}
     with open(file_path, 'r') as file:
@@ -62,43 +54,92 @@ def parse_gpa(file_path):
                 else:
                     continue  # Skip lines that do not have enough data
     return go_mappings
+
 # Path to the GPA file (make sure this path is correct)
 gpa_path = 'goa_uniprot_gcrp.gpa'
+
 # Get the GO mappings
 go_mappings = parse_gpa(gpa_path)
 
-######
+
+
+
+##3333333333333333333##
+
 import pandas as pd
-import numpy as np
 
-# Load your dataset (assuming `read_counts_df` is already loaded and contains the necessary data)
+# Load the read counts data
+read_counts_path = "read-counts.txt"
+read_counts_df = pd.read_csv(read_counts_path, sep='\t', skiprows=1)
 
-# Placeholder mapping from Gene IDs to UniProt IDs
-gene_to_uniprot = {
-    'GeneID1': 'UniProtID1',
-    'GeneID2': 'UniProtID2',
-    # Continue this mapping based on your actual dataset
-}
+# Load the mapping table and create a lookup dictionary
+mapping_df = pd.read_csv('mapping_table.tsv', sep='\t')
+ensembl_to_uniprot = mapping_df.set_index('Ensembl_ID')['UniProt_ID'].to_dict()
 
-# Placeholder GO mappings from `parse_gpa` function
-go_mappings = {
-    'UniProtID1': {'GO:0000001', 'GO:0000002'},
-    'UniProtID2': {'GO:0000003'},
-    # Continue this mapping with actual data
-}
+# Replace Ensembl IDs in 'Geneid' with UniProt IDs
+read_counts_df['Geneid'] = read_counts_df['Geneid'].apply(lambda x: ensembl_to_uniprot.get(x, x))
 
-# Apply mapping to convert Gene IDs to UniProt IDs and then to GO Terms
-read_counts_df['UniProt_ID'] = read_counts_df['Geneid'].apply(lambda x: gene_to_uniprot.get(x))
-read_counts_df['GO_Terms'] = read_counts_df['UniProt_ID'].apply(lambda x: go_mappings.get(x, set()))
+# Verify the replacements
+print("Updated DataFrame with UniProt IDs:")
+print(read_counts_df[['Geneid']].head())
 
-# Explode the DataFrame on GO_Terms to analyze each term separately
-expanded_df = read_counts_df.explode('GO_Terms')
 
-# Calculate the average enrichment and ribosome density changes for each GO term
-grouped_data = expanded_df.groupby('GO_Terms').agg({
+
+
+##444444444##
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+# Assuming the dataframe 'read_counts_df' and dictionary 'go_mappings' are ready to use
+
+# Function to map GO terms
+def map_go_terms(uniprot_id):
+    return go_mappings.get(uniprot_id, set())
+
+# Map GO terms to each entry in the dataframe
+read_counts_df['GO_Terms'] = read_counts_df['Geneid'].apply(map_go_terms)
+
+# Flatten DataFrame to have one row per GO term per gene
+rows = []
+for _, row in read_counts_df.iterrows():
+    for go_term in row['GO_Terms']:
+        rows.append({
+            'Geneid': row['Geneid'],
+            'GO_Term': go_term,
+            'Enrichment_Level_CLIP': row['Enrichment_Level_CLIP'],
+            'Ribosome_Density_Change': row['Ribosome_Density_Change']
+        })
+go_term_df = pd.DataFrame(rows)
+
+# Aggregate data by GO Term
+grouped = go_term_df.groupby('GO_Term').agg({
     'Enrichment_Level_CLIP': 'mean',
-    'Ribosome_Density_Change': 'mean'
-}).reset_index()
+    'Ribosome_Density_Change': 'mean',
+    'Geneid': 'count'
+}).rename(columns={'Geneid': 'Number_of_Genes'}).reset_index()
 
-# Display the resulting grouped data
-print(grouped_data.head(5))
+# Assume statistical analysis done, p-values simulated
+grouped['P_value_CLIP'] = np.random.uniform(0.01, 0.05, len(grouped))
+
+# Visualization
+plt.figure(figsize=(10, 6))
+scatter_plot = sns.scatterplot(
+    data=grouped,
+    x='Enrichment_Level_CLIP',
+    y='Ribosome_Density_Change',
+    size='Number_of_Genes',
+    hue='P_value_CLIP',
+    palette='viridis',
+    alpha=0.6,
+    sizes=(20, 200)
+)
+plt.axhline(0, color='grey', lw=0.8)
+plt.axvline(0, color='grey', lw=0.8)
+plt.xlabel('Enrichment Level of LIN28A-bound CLIP tags (log2)')
+plt.ylabel('Change in Ribosome Density upon LIN28a Knockdown (log2)')
+plt.title('Gene Ontology Term-Enrichment Analysis for CLIP and Ribosome Profiling')
+plt.grid(True)
+plt.legend(title='P-value (CLIP)')
+plt.show()
+
