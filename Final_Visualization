@@ -1,1 +1,81 @@
-d
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+# Loading
+data_path = 'filtered_results_df.tsv'
+data_df = pd.read_csv(data_path, sep='\t')
+
+# Defining GO terms
+go_term_map = {
+    'GO:0005739': ('mitochondrion', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0005789': ('endoplasmic reticulum membrane', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0005737': ('cytoplasm', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0005788': ('endoplasmic reticulum lumen', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0009986': ('cell surface', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0005509': ('calcium ion binding', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0005794': ('Golgi apparatus', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value'),
+    'GO:0000786': ('nucleosome', 'Gene_Count', 'Enrichment_p_value', 'Ribosome_p_value')
+}
+
+# color: -log10 of FDR
+data_df['FDR_intensity'] = -np.log10(data_df['Enrichment_FDR'].clip(lower=1e-20))
+
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.set_aspect('equal')
+
+# Scatter plot
+scatter = ax.scatter(
+    data_df['Enrichment_Level_CLIP'], data_df['Ribosome_Density_Change'],
+    s=data_df['Gene_Count']*0.2,  # Adjust size for visibility
+    c=data_df['FDR_intensity'], cmap='YlOrRd', alpha=0.8, marker='o',
+    edgecolors='none'  # Removing circle borders
+)
+
+# offset annotation
+offsets = {
+    'Golgi apparatus': (-90, -100),
+    'cytoplasm': (75, -70),
+    'mitochondrion': (210, -80),
+    'endoplasmic reticulum lumen': (150, -90),
+    'endoplasmic reticulum membrane': (-75, 90),
+    'cell surface': (160, 90),
+    'calcium ion binding': (-80, 20),
+    'nucleosome': (80, 30)
+}
+
+for go_id, details in go_term_map.items():
+    label, _, _, _ = details
+    subset = data_df[data_df['GO_Term'] == go_id]
+    for _, row in subset.iterrows():
+        # Format p-values in scientific notation
+        c_value = f'{row.Enrichment_p_value:.2e}'
+        r_value = f'{row.Ribosome_p_value:.2e}'
+        text_offset = offsets[label]
+        annotation = ax.annotate(f'{label} ({row.Gene_Count})\nC={c_value}, R={r_value}', 
+                    (row.Enrichment_Level_CLIP, row.Ribosome_Density_Change), textcoords="offset points", 
+                    xytext=text_offset, ha='center', fontsize=9, bbox=dict(boxstyle="round,pad=0.3", facecolor='white', edgecolor='black', alpha=0.6))
+
+        # Draw arrows from text to points
+        ax.annotate('', xy=(row.Enrichment_Level_CLIP, row.Ribosome_Density_Change), xytext=(row.Enrichment_Level_CLIP + text_offset[0]/100, row.Ribosome_Density_Change + text_offset[1]/100),
+                    arrowprops=dict(facecolor='black', arrowstyle='->', connectionstyle='arc'))
+
+# cbar
+cbar = plt.colorbar(scatter, ax=ax, pad=0.05)
+cbar.set_label('Term-specific enrichment confidence (false discovery rate)', labelpad=10)
+cbar.set_ticks(np.arange(0, 21, 2))
+cbar.set_ticklabels([f'$10^{{-{i}}}$' for i in range(0, 21, 2)])
+cbar.ax.yaxis.set_label_position('left')
+
+# Graph labels and title
+ax.set_xlabel('Enrichment Level of LIN28A-bound CLIP Tags (log2)')
+ax.set_ylabel('Ribosome Density Change upon Lin28A Knockdown (log2)', labelpad=10)
+
+# Axis and grid
+ax.set_xlim(-2, 5.0)
+ax.set_xticks(np.arange(-2, 5.5, 0.5))
+ax.set_yticks(np.arange(-1.0, 1.75, 0.5))
+plt.grid(True, linestyle='--')
+
+# Display
+plt.show()
