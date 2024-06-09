@@ -1,0 +1,27 @@
+# Install biomaRt
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("biomaRt")
+
+# biomaRt; ensembl ID to GO
+library(biomaRt)
+
+mart <- useMart("ensembl", dataset="mmusculus_gene_ensembl")
+ensembl_ids <- read.table("ensembl.txt", header=FALSE, stringsAsFactors=FALSE)
+colnames(ensembl_ids) <- c("ensembl_gene_id")
+
+attributes <- c('ensembl_gene_id', 'go_id')
+filters <- 'ensembl_gene_id'
+values <- ensembl_ids$ensembl_gene_id
+
+go_data <- getBM(attributes=attributes, filters=filters, values=values, mart=mart)
+go_data <- go_data[go_data$go_id != '',]
+
+
+library(dplyr)
+go_data_grouped <- go_data %>%
+  group_by(ensembl_gene_id) %>%
+  summarise(go_ids = toString(unique(go_id)))
+
+write.table(go_data_grouped, "ensembl_to_go_terms.txt", sep="\t", row.names=FALSE, quote=FALSE)
+print(head(go_data_grouped))
