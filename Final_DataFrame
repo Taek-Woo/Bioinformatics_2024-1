@@ -51,3 +51,9 @@ for go_term, group in go_term_df.groupby('GO_Term'):
 
 results_df = pd.DataFrame(results)
 results_df.to_csv('results_df.tsv', sep='\t', index=False)
+
+
+# Filtering: Adjust p-values using Benjamini-Hochberg method
+results_df['Enrichment_FDR'] = multipletests(results_df['Enrichment_p_value'], method='fdr_bh')[1]
+filtered_results_df = results_df[(results_df['Enrichment_FDR'] < 0.05) ]
+filtered_results_df.to_csv('filtered_results_df.tsv', sep='\t', index=False)
