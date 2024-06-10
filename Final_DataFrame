@@ -3,24 +3,20 @@ import numpy as np
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.multitest import multipletests
 
-# Loading
+
 read_counts_path = 'read-counts.txt'
 read_counts_df = pd.read_csv(read_counts_path, sep='\t', header=0)
-
-# Calculation
-read_counts_df['Mean_RNA_counts'] = read_counts_df[['RNA-control.bam', 'RNA-siLin28a.bam', 'RNA-siLuc.bam']].mean(axis=1)
-read_counts_df['Enrichment_Level_CLIP'] = np.log2((read_counts_df['CLIP-35L33G.bam'] + 0.01) / (read_counts_df['Mean_RNA_counts'] + 0.01))
-read_counts_df['Ribosome_Density_Change'] = np.log2((read_counts_df['RPF-siLin28a.bam'] + 0.01) / (read_counts_df['RPF-siLuc.bam'] + 0.01))
-read_counts_df['GO_Terms'] = read_counts_df['Geneid'].apply(lambda x: ensembl_to_go.get(x, set()))
-
-# mapping
 ensembl_to_go_terms_path = 'ensembl_to_go_terms.txt'
 ensembl_to_go_df = pd.read_csv(ensembl_to_go_terms_path, sep='\t', header=0)
 ensembl_to_go_df['GO_Term'] = ensembl_to_go_df['GO_Term'].apply(lambda x: x.split(', '))
 ensembl_to_go_expanded = ensembl_to_go_df.explode('GO_Term')
 ensembl_to_go = ensembl_to_go_expanded.groupby('Ensembl_ID')['GO_Term'].apply(set).to_dict()
 
-# sorting
+
+read_counts_df['Enrichment_Level_CLIP'] = np.log2((read_counts_df['CLIP-35L33G.bam'] + 0.01) / (read_counts_df['RNA-control.bam'] + 0.01))
+read_counts_df['Ribosome_Density_Change'] = np.log2((read_counts_df['RPF-siLin28a.bam'] + 0.01) / (read_counts_df['RPF-siLuc.bam'] + 0.01))
+read_counts_df['GO_Terms'] = read_counts_df['Geneid'].apply(lambda x: ensembl_to_go.get(x, set()))
+
 rows = []
 for index, row in read_counts_df.iterrows():
     for go_term in row['GO_Terms']:
@@ -30,7 +26,9 @@ for index, row in read_counts_df.iterrows():
             'Enrichment_Level_CLIP': row['Enrichment_Level_CLIP'],
             'Ribosome_Density_Change': row['Ribosome_Density_Change']
         })
+
 go_term_df = pd.DataFrame(rows)
+
 results = []
 for go_term, group in go_term_df.groupby('GO_Term'):
     enrichment_within = group['Enrichment_Level_CLIP']
@@ -43,17 +41,18 @@ for go_term, group in go_term_df.groupby('GO_Term'):
     results.append({
         'GO_Term': go_term,
         'Gene_Count': len(group),
-        'Mean_Enrichment_Level_CLIP': enrichment_within.mean(),
-        'Mean_Ribosome_Density_Change': ribosome_within.mean(),
+        'Enrichment_Level_CLIP': enrichment_within.mean(),
+        'Ribosome_Density_Change': ribosome_within.mean(),
         'Enrichment_p_value': enrichment_p_value,
         'Ribosome_p_value': ribosome_p_value
     })
+
 
 results_df = pd.DataFrame(results)
 results_df.to_csv('results_df.tsv', sep='\t', index=False)
 
 
-# Filtering: Adjust p-values using Benjamini-Hochberg method
 results_df['Enrichment_FDR'] = multipletests(results_df['Enrichment_p_value'], method='fdr_bh')[1]
 filtered_results_df = results_df[(results_df['Enrichment_FDR'] < 0.05) ]
 filtered_results_df.to_csv('filtered_results_df.tsv', sep='\t', index=False)
+
